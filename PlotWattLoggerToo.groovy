@@ -1,5 +1,5 @@
 /**
- *  PlotWatt Logger 
+ *  PlotWatt Logger Too
  *
  *  Copyright 2015 Brian Wilson
  *  Extended by Barry Burke to send data max once per minute, saving up values for bulk updates when necessary (ie. HEM reports total
