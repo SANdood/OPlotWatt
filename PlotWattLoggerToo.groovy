@@ -2,6 +2,8 @@
  *  PlotWatt Logger 
  *
  *  Copyright 2015 Brian Wilson
+ *  Extended by Barry Burke to send data max once per minute, saving up values for bulk updates when necessary (ie. HEM reports total
+ *  power multiple times per minute). This is necessary to avoid PlotWatt API throttling.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -16,10 +18,10 @@
  *
  */
 definition(
-    name: "PlottWatt Logger",
-    namespace: "bdwilson",
-    author: "Brian Wilson",
-    description: "PlotWatter Logger",
+    name: "PlottWatt Logger Too",
+    namespace: "sandood",
+    author: "Brian Wilson & Barry Burke",
+    description: "PlotWatter Logger Too",
     category: "My Apps",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
@@ -41,6 +43,8 @@ preferences {
 }
 
 def installed() {
+    state.count = null
+    state.reports = ""
     initialize()
 }
 
@@ -51,6 +55,7 @@ def updated() {
 
 def initialize() {
     subscribe(power, "power", handlePowerEvent)
+    state.lastReport = 0 as Integer
 }
 
 def handlePowerEvent(evt) {
@@ -59,6 +64,7 @@ def handlePowerEvent(evt) {
 
 
 private logField(evt, field, Closure c) {
+	def MIN_ELAPSED = 60 as Integer
     def value = c(evt.value)
     float watts = value.toFloat()
     def kwatts = watts/1000
@@ -66,25 +72,31 @@ private logField(evt, field, Closure c) {
     def date = now.time
     def millis = date.time
     def secs = millis/1000
-    secs = secs.toInteger()
+    secs = Math.round(secs)
+    if ( state.lastReport > secs) {
+    	state.lastReport = 0 as Integer
+    }
+    Integer elapsed = secs - state.lastReport
     
     if (state.count) {
     	state.count = state.count +1
-        state.power = state.power + ",${kwatts}"
-        state.time = state.time + ",${secs}"
+        state.reports = state.reports + ",${channelKey},${kwatts},${secs}"
     } else {
         state.count = 1
-        state.power = "[${kwatts}"
-        state.time = "[${secs}"
+        state.reports = "${channelKey},${kwatts},${secs}"
     }
 
-	log.debug "${state.power}"
-	if (state.count < 4) { return }
+	log.debug "${state.reports}"
     
-    def body = "${channelKey},${state.power}],${state.time}]" 
- 
- log.debug "${body}"
+
+//	if (state.count < 4) { return }
+	if (elapsed < MIN_ELAPSED) { return }
+    
+    def body = state.reports
+
  	state.count = null
+    state.reports = null
+    state.lastReport = secs
     
 	def uri = "http://${channelId}:@plotwatt.com/api/v2/push_readings"
        def params = [
