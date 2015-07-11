@@ -59,15 +59,34 @@ def handlePowerEvent(evt) {
 
 
 private logField(evt, field, Closure c) {
+	
     def value = c(evt.value)
     float watts = value.toFloat()
-    def kwatts = watts/1000
+
+	def i
+    if (state.index) {
+    	i = state.index
+    } else {
+    	state.index = 1
+    	i = 1
+    }
+    state.index = state.index +1
+    state.kwatts[i] = watts/1000
+    log.debug "Watts: ${state.kwatts[i]}"
+    	
     def now = Calendar.instance
     def date = now.time
     def millis = date.time
     def secs = millis/1000
     secs = secs.toInteger()
-    def body = "${channelKey},${kwatts},${secs}"
+    state.time[i] = secs
+    
+    if (i<4) { return }	// send batches of 4 readings
+    
+    def body = "${channelKey}," +
+    "[${state.kwatts[1]},${state.kwatts[2]},${state.kwatts[3]},${state.kwatts[4]}]," +
+    "[${state.time[1]},${state.time[2]},${state.time[3]},${state.time[4]}]"
+    state.index = 0
     
 	def uri = "http://${channelId}:@plotwatt.com/api/v2/push_readings"
        def params = [
