@@ -1,5 +1,5 @@
 /**
- *  PlotWatt Logger Too
+ *  PlotWatt Logger 
  *
  *  Copyright 2015 Brian Wilson
  *  Extended by Barry Burke to send data max once per minute, saving up values for bulk updates when necessary (ie. HEM reports total
@@ -65,6 +65,8 @@ def handlePowerEvent(evt) {
 
 private logField(evt, field, Closure c) {
 	def MIN_ELAPSED = 60 as Integer
+    def MAX_REPORTS = 45 as Integer
+    
     def value = c(evt.value)
     float watts = value.toFloat()
     def kwatts = watts/1000
@@ -73,6 +75,7 @@ private logField(evt, field, Closure c) {
     def millis = date.time
     def secs = millis/1000
     secs = Math.round(secs)
+    
     if ( state.lastReport > secs) {
     	state.lastReport = 0 as Integer
     }
@@ -80,26 +83,25 @@ private logField(evt, field, Closure c) {
     
     if (state.count) {
     	state.count = state.count +1
-        state.reports = state.reports + ",${channelKey},${kwatts},${secs}"
+        state.reports = "${channelKey},${kwatts},${secs}," + state.reports	// newest first
     } else {
         state.count = 1
         state.reports = "${channelKey},${kwatts},${secs}"
     }
 
-	log.debug "${state.reports}"
+//	log.debug "${state.reports}"
     
 
-//	if (state.count < 4) { return }
-	if (elapsed < MIN_ELAPSED) { return }
+	if ((elapsed < MIN_ELAPSED) && (state.count < MAX_REPORTS)) { return }
     
     def body = state.reports
 
  	state.count = null
     state.reports = null
-    state.lastReport = secs
+    state.lastReport = secs as Integer
     
 	def uri = "http://${channelId}:@plotwatt.com/api/v2/push_readings"
-       def params = [
+    def params = [
         uri: uri,
         body: body
     ] 
