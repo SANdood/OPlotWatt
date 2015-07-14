@@ -62,11 +62,9 @@ def handlePowerEvent(evt) {
     logField(evt,"power") { it.toString() }
 }
 
-
 private logField(evt, field, Closure c) {
 	def MIN_ELAPSED = 60 as Integer
     def MAX_REPORTS = 45 as Integer
-    
     def value = c(evt.value)
     float watts = value.toFloat()
     def kwatts = watts/1000
@@ -75,11 +73,6 @@ private logField(evt, field, Closure c) {
     def millis = date.time
     def secs = millis/1000
     secs = Math.round(secs)
-    
-    if ( state.lastReport > secs) {
-    	state.lastReport = 0 as Integer
-    }
-    Integer elapsed = secs - state.lastReport
     
     if (state.count) {
     	state.count = state.count +1
@@ -91,13 +84,13 @@ private logField(evt, field, Closure c) {
 
 //	log.debug "${state.reports}"
     
-
-	if ((elapsed < MIN_ELAPSED) && (state.count < MAX_REPORTS)) { return }
+    Integer elapsed = (state.lastReport > secs)? MIN_ELAPSED : (secs - state.lastReport)
     
+	if ((elapsed < MIN_ELAPSED) && (state.count < MAX_REPORTS)) { return }
+ 
     def body = state.reports
-
- 	state.count = null
-    state.reports = null
+    state.count = null			// reset these ASAP so that next Power report doesn't overwrite our data
+    state.reports = null		// Since we can get HEM Reports every second, but we don't send except every minute or 45 reports
     state.lastReport = secs as Integer
     
 	def uri = "http://${channelId}:@plotwatt.com/api/v2/push_readings"
